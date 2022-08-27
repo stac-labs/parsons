@@ -1,5 +1,5 @@
 requests==2.27.1
-petl==1.6.8
+petl==1.7.11
 boto3==1.17.98
 # boxsdk==2.10.0
 # civis==1.14.2
@@ -22,7 +22,7 @@ joblib==0.14.1
 #censusgeocode==0.4.3.post1
 #airtable-python-wrapper==0.13.0
 google-cloud-storage==2.2.0
-google-cloud-bigquery==3.0.1
+google-cloud-bigquery>=2.24.1
 docutils<0.18,>=0.14
 urllib3==1.26.8
 simplejson==3.16.0
