@@ -1,5 +1,5 @@
 requests==2.27.1
-petl==1.7.11
+petl
 boto3==1.17.98
 # boxsdk==2.10.0
 # civis==1.14.2
