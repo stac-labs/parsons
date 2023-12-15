@@ -78,7 +78,7 @@ def main():
             "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
         ],
-        python_requires=">=3.7.0,<3.11.0",
+        python_requires=">=3.7.0",
     )
 
 
