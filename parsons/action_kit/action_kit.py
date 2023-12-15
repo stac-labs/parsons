@@ -142,6 +142,20 @@ class ActionKit(object):
             **kwargs,
         )
 
+    def delete_actionfield(self, actionfield_id):
+        """
+        Delete an actionfield.
+
+        `Args:`
+            actionfield_id: int
+                The id of the actionfield to delete
+        `Returns:`
+            ``None``
+        """
+
+        resp = self.conn.delete(self._base_endpoint("actionfield", actionfield_id))
+        logger.info(f"{resp.status_code}: {actionfield_id}")
+
     def update_user(self, user_id, **kwargs):
         """
         Update a user.
@@ -218,6 +232,63 @@ class ActionKit(object):
             self._base_endpoint("event", event_id), data=json.dumps(kwargs)
         )
         logger.info(f"{resp.status_code}: {event_id}")
+
+    def get_blackholed_email(self, email):
+        """
+        Get a blackholed email. A blackholed email is an email that has been prevented from
+        receiving bulk and transactional emails from ActionKit. `Documentation <https://\
+        docs.actionkit.com/docs/manual/guide/mailings_tools.html#blackhole>`_.
+
+        `Args:`
+            email: str
+                Blackholed email of the record to get.
+        `Returns`:
+            Parsons.Table
+                The blackholed email data.
+        """
+
+        return self.paginated_get("blackholedemail", email=email)
+
+    def blackhole_email(self, email):
+        """
+        Prevent an email from receiving bulk and transactional emails from ActionKit.
+        `Documentation <https://docs.actionkit.com/docs/manual/guide/\
+        mailings_tools.html#blackhole>`_.
+
+        `Args:`
+            user_id: str
+                Email to blackhole
+        `Returns:`
+            API location of new resource
+        """
+
+        return self._base_post(
+            endpoint="blackholedemail",
+            exception_message="Could not blackhole email",
+            email=email,
+        )
+
+    def delete_user_data(self, email, **kwargs):
+        """
+        Delete user data.
+
+        `Args:`
+            email: str
+                Email of user to delete data
+            **kwargs:
+                Optional arguments and fields to pass to the client. A full list can be found
+                in the `ActionKit API Documentation <https://docs.actionkit.com/docs/manual/api/\
+                rest/users.html>`_.
+        `Returns:`
+            API location of anonymized user
+        """
+
+        return self._base_post(
+            endpoint="eraser",
+            exception_message="Could not delete user data",
+            email=email,
+            **kwargs,
+        )
 
     def delete_user(self, user_id):
         """
@@ -580,13 +651,14 @@ class ActionKit(object):
                 in the `ActionKit API Documentation <https://roboticdogs.actionkit.com/docs/\
                 manual/api/rest/actionprocessing.html>`_.
         `Returns:`
-            ``None``
+            ``HTTP response from the patch request``
         """
 
         resp = self.conn.patch(
             self._base_endpoint("mailer", mailer_id), data=json.dumps(kwargs)
         )
         logger.info(f"{resp.status_code}: {mailer_id}")
+        return resp
 
     def rebuild_mailer(self, mailing_id):
         """
@@ -768,6 +840,23 @@ class ActionKit(object):
         )
         logger.info(f"{resp.status_code}: {order_id}")
 
+    def get_orderrecurring(self, orderrecurring_id):
+        """
+        Get an orderrecurring.
+
+        `Args:`
+            orderrecurring_id: int
+                The orderrecurring id of the record to get.
+        `Returns`:
+            User json object
+        """
+
+        return self._base_get(
+            endpoint="orderrecurring",
+            entity_id=orderrecurring_id,
+            exception_message="Orderrecurring not found",
+        )
+
     def cancel_orderrecurring(self, recurring_id):
         """
         Cancel a recurring order.
@@ -784,6 +873,27 @@ class ActionKit(object):
         )
         logger.info(f"{resp.status_code}: {recurring_id}")
         return resp
+
+    def update_orderrecurring(self, orderrecurring_id, **kwargs):
+        """
+        Update a recurring order.
+
+        `Args:`
+            orderrecurring_id: int
+                The id of the orderrecurring to update
+            **kwargs:
+                Optional arguments and fields to pass to the client. A full list can be found
+                in the `ActionKit API Documentation <https://roboticdogs.actionkit.com/docs/\
+                manual/api/rest/actionprocessing.html>`_.
+        `Returns:`
+            ``None``
+        """
+
+        resp = self.conn.patch(
+            self._base_endpoint("orderrecurring", orderrecurring_id),
+            data=json.dumps(kwargs),
+        )
+        logger.info(f"{resp.status_code}: {orderrecurring_id}")
 
     def get_orders(self, limit=None, **kwargs):
         """Get multiple orders.
@@ -805,7 +915,7 @@ class ActionKit(object):
                     ak.get_orders(import_id="my-import-123")
         `Returns:`
             Parsons.Table
-                The events data.
+                The orders data.
         """
         return self.paginated_get("order", limit=limit, **kwargs)
 
@@ -982,7 +1092,7 @@ class ActionKit(object):
                     ak.get_transactions(order="order-1")
         `Returns:`
             Parsons.Table
-                The events data.
+                The transactions data.
         """
         return self.paginated_get("transaction", limit=limit, **kwargs)
 

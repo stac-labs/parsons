@@ -162,6 +162,8 @@ of commonly used methods. The full list can be found in the API section.
       - Remove a column
     * - :py:meth:`~parsons.etl.etl.ETL.rename_column`
       - Rename a column
+    * - :py:meth:`~parsons.etl.etl.ETL.rename_columns`
+      - Rename multiple columns
     * - :py:meth:`~parsons.etl.etl.ETL.move_column`
       - Move a column within a table
     * - :py:meth:`~parsons.etl.etl.ETL.cut`
@@ -196,6 +198,8 @@ of commonly used methods. The full list can be found in the API section.
       - Divide tables into smaller tables based on row count
     * - :py:meth:`~parsons.etl.etl.ETL.remove_null_rows`
       - Removes rows with null values in specified columns
+    * - :py:meth:`~parsons.etl.etl.ETL.deduplicate`
+      - Removes duplicate rows based on optional key(s), and optionally sorts
 
 
 **Extraction and Reshaping**

@@ -1,15 +1,16 @@
 We're thrilled that you're thinking about contributing to Parsons! Welcome to our contributor community.
 
-Here are some ways you can contribute:
+You can find a detailed version of this guide [on our website](https://www.parsonsproject.org/pub/contributing-guide/).
 
-* [submit an issue](#submitting-issues)
-* [contribute code](#contributing-code-to-parsons)
-* [contribute documentation](#documentation)
-* [add sample code to our library of examples](#contributing-sample-code)
+The best way to get involved is by joining our Slack. To join, email engineering@movementcooperative.org. In addition to all the great discussions that happen on our Slack, we also have virtual events including trainings, pairing sessions, social hangouts, discussions, and more. Every other Thursday afternoon we host 🎉 Parsons Parties 🎉 on Zoom where we work on contributions together.
 
-Every other Thursday afternoon we host 🎉 Parsons Parties 🎉 on Zoom where we work on contributions together. Reach out if you'd like to join - it's a great way to get involved.
+You can contribute by:
 
-## Submitting Issues
+* [submitting issues](https://www.parsonsproject.org/pub/contributing-guide#submitting-issues)
+* [contributing code](https://www.parsonsproject.org/pub/contributing-guide/)
+* [updating our documentation](https://www.parsonsproject.org/pub/updating-documentation/)
+* [teaching and mentoring](https://www.parsonsproject.org/pub/contributing-guide#teaching-and-mentoring)
+* [helping "triage" issues and review pull requests](https://www.parsonsproject.org/pub/contributing-guide#maintainer-tasks)
 
 We encourage folks to review existing issues before starting a new issue.
 
@@ -94,6 +95,13 @@ Run the following commands from the root of the Parsons repository to lint your 
 > flake8 --max-line-length=100 --extend-ignore=E203,W503 parsons
 > black parsons
 ```
+
+Pre-commit hooks are available to enforce black and isort formatting on
+commit. You can also set up your IDE to reformat using black and/or isort on
+save.
+
+To set up the pre-commit hooks, install pre-commit with `pip install
+pre-commit`, and then run `pre-commit install`.
 
 #### Coding Conventions
 

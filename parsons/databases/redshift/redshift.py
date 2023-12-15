@@ -1,3 +1,4 @@
+from typing import List, Optional
 from parsons.etl.table import Table
 from parsons.databases.redshift.rs_copy_table import RedshiftCopyTable
 from parsons.databases.redshift.rs_create_table import RedshiftCreateTable
@@ -6,6 +7,7 @@ from parsons.databases.redshift.rs_schema import RedshiftSchema
 from parsons.databases.table import BaseTable
 from parsons.databases.alchemy import Alchemy
 from parsons.utilities import files, sql_helpers
+from parsons.databases.database_connector import DatabaseConnector
 import psycopg2
 import psycopg2.extras
 import os
@@ -31,6 +33,7 @@ class Redshift(
     RedshiftTableUtilities,
     RedshiftSchema,
     Alchemy,
+    DatabaseConnector,
 ):
     """
     A Redshift class to connect to database.
@@ -152,7 +155,7 @@ class Redshift(
         finally:
             cur.close()
 
-    def query(self, sql, parameters=None):
+    def query(self, sql: str, parameters: Optional[list] = None) -> Optional[Table]:
         """
         Execute a query against the Redshift database. Will return ``None``
         if the query returns zero rows.
@@ -221,7 +224,6 @@ class Redshift(
         #        rows in the correct order
 
         with self.cursor(connection) as cursor:
-
             if "credentials" not in sql:
                 logger.debug(f"SQL Query: {sql}")
             cursor.execute(sql, parameters)
@@ -235,7 +237,6 @@ class Redshift(
                 return None
 
             else:
-
                 # Fetch the data in batches, and "pickle" the rows to a temp file.
                 # (We pickle rather than writing to, say, a CSV, so that we maintain
                 # all the type information for each field.)
@@ -295,6 +296,7 @@ class Redshift(
         bucket_region=None,
         strict_length=True,
         template_table=None,
+        line_delimited=False,
     ):
         """
         Copy a file from s3 to Redshift.
@@ -397,7 +399,6 @@ class Redshift(
         """
 
         with self.connection() as connection:
-
             if self._create_table_precheck(connection, table_name, if_exists):
                 if template_table:
                     sql = f"CREATE TABLE {table_name} (LIKE {template_table})"
@@ -414,6 +415,8 @@ class Redshift(
                     local_path = s3.get_file(bucket, key)
                     if data_type == "csv":
                         tbl = Table.from_csv(local_path, delimiter=csv_delimiter)
+                    elif data_type == "json":
+                        tbl = Table.from_json(local_path, line_delimited=line_delimited)
                     else:
                         raise TypeError("Invalid data type provided")
 
@@ -433,6 +436,7 @@ class Redshift(
                 logger.info(f"{table_name} created.")
 
             # Copy the table
+            logger.info(f"Data type is {data_type}")
             copy_sql = self.copy_statement(
                 table_name,
                 bucket,
@@ -464,36 +468,36 @@ class Redshift(
 
     def copy(
         self,
-        tbl,
-        table_name,
-        if_exists="fail",
-        max_errors=0,
-        distkey=None,
-        sortkey=None,
-        padding=None,
-        statupdate=None,
-        compupdate=None,
-        acceptanydate=True,
-        emptyasnull=True,
-        blanksasnull=True,
-        nullas=None,
-        acceptinvchars=True,
-        dateformat="auto",
-        timeformat="auto",
-        varchar_max=None,
-        truncatecolumns=False,
-        columntypes=None,
-        specifycols=None,
-        alter_table=False,
-        alter_table_cascade=False,
-        aws_access_key_id=None,
-        aws_secret_access_key=None,
-        iam_role=None,
-        cleanup_s3_file=True,
-        template_table=None,
-        temp_bucket_region=None,
-        strict_length=True,
-        csv_encoding="utf-8",
+        tbl: Table,
+        table_name: str,
+        if_exists: str = "fail",
+        max_errors: int = 0,
+        distkey: Optional[str] = None,
+        sortkey: Optional[str] = None,
+        padding: Optional[float] = None,
+        statupdate: Optional[bool] = None,
+        compupdate: Optional[bool] = None,
+        acceptanydate: bool = True,
+        emptyasnull: bool = True,
+        blanksasnull: bool = True,
+        nullas: Optional[str] = None,
+        acceptinvchars: bool = True,
+        dateformat: str = "auto",
+        timeformat: str = "auto",
+        varchar_max: Optional[List[str]] = None,
+        truncatecolumns: bool = False,
+        columntypes: Optional[dict] = None,
+        specifycols: Optional[bool] = None,
+        alter_table: bool = False,
+        alter_table_cascade: bool = False,
+        aws_access_key_id: Optional[str] = None,
+        aws_secret_access_key: Optional[str] = None,
+        iam_role: Optional[str] = None,  # Unused - Should we remove?
+        cleanup_s3_file: bool = True,
+        template_table: Optional[str] = None,
+        temp_bucket_region: Optional[str] = None,
+        strict_length: bool = True,
+        csv_encoding: str = "utf-8",
     ):
         """
         Copy a :ref:`parsons-table` to Redshift.
@@ -516,9 +520,6 @@ class Redshift(
             padding: float
                 A percentage padding to add to varchar columns if creating a new table. This is
                 helpful to add a buffer for future copies in which the data might be wider.
-            varchar_max: list
-                A list of columns in which to set the width of the varchar column to 65,535
-                characters.
             statupate: boolean
                 Governs automatic computation and refresh of optimizer statistics at the end
                 of a successful COPY command. If ``True`` explicitly sets ``statupate`` to on, if
@@ -556,6 +557,9 @@ class Redshift(
                 Set the date format. Defaults to ``auto``.
             timeformat: str
                 Set the time format. Defaults to ``auto``.
+            varchar_max: list
+                A list of columns in which to set the width of the varchar column to 65,535
+                characters.
             truncatecolumns: boolean
                 If the table already exists, truncates data in columns to the appropriate number
                 of characters so that it fits the column specification. Applies only to columns
@@ -603,7 +607,7 @@ class Redshift(
                 in a different region from the temp bucket.
             strict_length: bool
                 Whether or not to tightly fit the length of the table columns to the length
-                of the data in ``tbl``; if ``padding`` is specified, this argument is ignored
+                of the data in ``tbl``; if ``padding`` is specified, this argument is ignored.
             csv_ecoding: str
                 String encoding to use when writing the temporary CSV file that is uploaded to S3.
                 Defaults to 'utf-8'.
@@ -620,7 +624,6 @@ class Redshift(
             cols = None
 
         with self.connection() as connection:
-
             # Check to see if the table exists. If it does not or if_exists = drop, then
             # create the new table.
             if self._create_table_precheck(connection, table_name, if_exists):
@@ -709,6 +712,7 @@ class Redshift(
         allow_overwrite=True,
         parallel=True,
         max_file_size="6.2 GB",
+        extension=None,
         aws_region=None,
         aws_access_key_id=None,
         aws_secret_access_key=None,
@@ -720,7 +724,7 @@ class Redshift(
 
         sql: str
             The SQL string to execute to generate the data to unload.
-        buckey: str
+        bucket: str
            The destination S3 bucket
         key_prefix: str
             The prefix of the key names that will be written
@@ -754,6 +758,8 @@ class Redshift(
         max_file_size: str
             The maximum size of files UNLOAD creates in Amazon S3. Specify a decimal value between
             5 MB and 6.2 GB.
+        extension: str
+            This extension will be added to the end of file names loaded to S3
         region: str
             The AWS Region where the target Amazon S3 bucket is located. REGION is required for
             UNLOAD to an Amazon S3 bucket that is not in the same AWS Region as the Amazon Redshift
@@ -793,6 +799,8 @@ class Redshift(
             statement += "ESCAPE \n"
         if allow_overwrite:
             statement += "ALLOWOVERWRITE \n"
+        if extension:
+            statement += f"EXTENSION '{extension}' \n"
         if aws_region:
             statement += f"REGION {aws_region} \n"
 
@@ -802,6 +810,66 @@ class Redshift(
         logger.debug(statement_censored)
 
         return self.query(statement)
+
+    def drop_and_unload(
+        self,
+        rs_table,
+        bucket,
+        key,
+        cascade=True,
+        manifest=True,
+        header=True,
+        delimiter="|",
+        compression="gzip",
+        add_quotes=True,
+        escape=True,
+        allow_overwrite=True,
+        parallel=True,
+        max_file_size="6.2 GB",
+        aws_region=None,
+    ):
+        """
+        Unload data to s3, and then drop Redshift table
+
+        Args:
+            rs_table: str
+                Redshift table.
+
+            bucket: str
+                S3 bucket
+
+            key: str
+                S3 key prefix ahead of table name
+
+            cascade: bool
+                whether to drop cascade
+
+            ***unload params
+
+        Returns:
+            None
+        """
+        query_end = "cascade" if cascade else ""
+
+        self.unload(
+            sql=f"select * from {rs_table}",
+            bucket=bucket,
+            key_prefix=f"{key}/{rs_table.replace('.','_')}/",
+            manifest=manifest,
+            header=header,
+            delimiter=delimiter,
+            compression=compression,
+            add_quotes=add_quotes,
+            escape=escape,
+            allow_overwrite=allow_overwrite,
+            parallel=parallel,
+            max_file_size=max_file_size,
+            aws_region=aws_region,
+        )
+
+        self.query(f"drop table if exists {rs_table} {query_end}")
+
+        return None
 
     def generate_manifest(
         self,
@@ -859,7 +927,6 @@ class Redshift(
         # Generate manifest file
         manifest = {"entries": []}
         for bucket in buckets:
-
             # Retrieve list of files in bucket
             key_list = s3.list_keys(bucket, prefix=prefix)
             for key in key_list:
@@ -982,7 +1049,6 @@ class Redshift(
                 raise ValueError("Primary key column contains duplicate values.")
 
         with self.connection() as connection:
-
             try:
                 # Copy to a staging table
                 logger.info(f"Building staging table: {staging_tbl}")
@@ -1087,7 +1153,9 @@ class Redshift(
             tbl = self.query_with_connection(sql_depend, connection)
             dropped_views = [row["table_name"] for row in tbl]
             if dropped_views:
-                sql_drop = "\n".join([f"drop view {view};" for view in dropped_views])
+                sql_drop = "\n".join(
+                    [f"drop view {view} CASCADE;" for view in dropped_views]
+                )
                 tbl = self.query_with_connection(sql_drop, connection)
                 logger.info(f"Dropped the following views: {dropped_views}")
 

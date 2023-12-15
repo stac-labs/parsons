@@ -41,6 +41,19 @@ class TestActionKit(unittest.TestCase):
         url = self.actionkit._base_endpoint("user", "1234")
         self.assertEqual(url, "https://domain.actionkit.com/rest/v1/user/1234/")
 
+    def test_delete_actionfield(self):
+        # Test delete actionfield
+
+        # Mock resp and status code
+        resp_mock = mock.MagicMock()
+        type(resp_mock.patch()).status_code = mock.PropertyMock(return_value=204)
+        self.actionkit.conn = resp_mock
+
+        self.actionkit.delete_actionfield(123)
+        self.actionkit.conn.delete.assert_called_with(
+            "https://domain.actionkit.com/rest/v1/actionfield/123/",
+        )
+
     def test_get_user(self):
         # Test get user
         self.actionkit.get_user(123)
@@ -93,6 +106,47 @@ class TestActionKit(unittest.TestCase):
         self.actionkit.conn.patch.assert_called_with(
             "https://domain.actionkit.com/rest/v1/event/123/",
             data=json.dumps({"is_approved": "test"}),
+        )
+
+    def test_get_blackholed_email(self):
+        # Test get blackholed email
+        resp_mock = mock.MagicMock()
+        type(resp_mock.get()).status_code = mock.PropertyMock(return_value=201)
+        type(resp_mock.get()).json = lambda x: {"meta": {"next": ""}, "objects": []}
+        self.actionkit.conn = resp_mock
+
+        self.actionkit.get_blackholed_email("test")
+        self.actionkit.conn.get.assert_called_with(
+            "https://domain.actionkit.com/rest/v1/blackholedemail/",
+            params={"email": "test", "_limit": 100},
+        )
+
+    def test_blackhole_email(self):
+        # Test blackhole email
+
+        # Mock resp and status code
+        resp_mock = mock.MagicMock()
+        type(resp_mock.post()).status_code = mock.PropertyMock(return_value=201)
+        self.actionkit.conn = resp_mock
+
+        self.actionkit.blackhole_email(email="test")
+        self.actionkit.conn.post.assert_called_with(
+            "https://domain.actionkit.com/rest/v1/blackholedemail/",
+            data=json.dumps({"email": "test"}),
+        )
+
+    def test_delete_user_data(self):
+        # Test delete user data
+
+        # Mock resp and status code
+        resp_mock = mock.MagicMock()
+        type(resp_mock.post()).status_code = mock.PropertyMock(return_value=201)
+        self.actionkit.conn = resp_mock
+
+        self.actionkit.delete_user_data(email="test")
+        self.actionkit.conn.post.assert_called_with(
+            "https://domain.actionkit.com/rest/v1/eraser/",
+            data=json.dumps({"email": "test"}),
         )
 
     def test_delete_user(self):
@@ -475,6 +529,13 @@ class TestActionKit(unittest.TestCase):
             data=json.dumps({"question_html": "test"}),
         )
 
+    def test_get_orderrecurring(self):
+        # Test get orderrecurring
+        self.actionkit.get_orderrecurring(123)
+        self.actionkit.conn.get.assert_called_with(
+            "https://domain.actionkit.com/rest/v1/orderrecurring/123/", params=None
+        )
+
     def test_cancel_orderrecurring(self):
         # Test cancel recurring order
 
@@ -486,6 +547,19 @@ class TestActionKit(unittest.TestCase):
         self.actionkit.cancel_orderrecurring(1)
         self.actionkit.conn.post.assert_called_with(
             "https://domain.actionkit.com/rest/v1/orderrecurring/1/cancel/"
+        )
+
+    def test_update_orderrecurring(self):
+        # Test update orderrecurring
+
+        # Mock resp and status code
+        resp_mock = mock.MagicMock()
+        type(resp_mock.patch()).status_code = mock.PropertyMock(return_value=202)
+        self.actionkit.conn = resp_mock
+        self.actionkit.update_orderrecurring(123, amount="1.00")
+        self.actionkit.conn.patch.assert_called_with(
+            "https://domain.actionkit.com/rest/v1/orderrecurring/123/",
+            data=json.dumps({"amount": "1.00"}),
         )
 
     def test_create_transaction(self):

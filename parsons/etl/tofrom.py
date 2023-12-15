@@ -2,6 +2,7 @@ import petl
 import json
 import io
 import gzip
+from typing import Optional
 from parsons.utilities import files, zip_archive
 
 
@@ -398,6 +399,7 @@ class ToFrom(object):
         acl="bucket-owner-full-control",
         public_url=False,
         public_url_expires=3600,
+        use_env_token=True,
         **csvargs,
     ):
         """
@@ -429,6 +431,10 @@ class ToFrom(object):
                 The time, in seconds, until the url expires if ``public_url`` set to ``True``.
             acl: str
                 The S3 permissions on the file
+            use_env_token: boolean
+                Controls use of the ``AWS_SESSION_TOKEN`` environment variable for S3. Defaults
+                to ``True``. Set to ``False`` in order to ignore the ``AWS_SESSION_TOKEN`` env
+                variable even if the ``aws_session_token`` argument was not passed in.
             \**csvargs: kwargs
                 ``csv_writer`` optional arguments
         `Returns:`
@@ -455,6 +461,7 @@ class ToFrom(object):
         self.s3 = S3(
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
+            use_env_token=use_env_token,
         )
         self.s3.put_file(bucket, key, local_path, acl=acl)
 
@@ -613,8 +620,39 @@ class ToFrom(object):
         pg = Postgres(username=username, password=password, host=host, db=db, port=port)
         pg.copy(self, table_name, **copy_args)
 
-    def to_petl(self):
+    def to_bigquery(
+        self,
+        table_name: str,
+        app_creds: Optional[str] = None,
+        project: Optional[str] = None,
+        **kwargs,
+    ):
+        """
+        Write a table to BigQuery
 
+        `Args`:
+            table_name: str
+                Table name to write to in BigQuery; this should be in `schema.table` format
+            app_creds: str
+                A credentials json string or a path to a json file. Not required
+                if ``GOOGLE_APPLICATION_CREDENTIALS`` env variable set.
+            project: str
+                The project which the client is acting on behalf of. If not passed
+                then will use the default inferred environment.
+            **kwargs: kwargs
+                Additional keyword arguments passed into the `.copy()` function (`if_exists`,
+                `max_errors`, etc.)
+
+        `Returns`:
+            ``None``
+        """
+
+        from parsons import GoogleBigQuery as BigQuery
+
+        bq = BigQuery(app_creds=app_creds, project=project)
+        bq.copy(self, table_name=table_name, **kwargs)
+
+    def to_petl(self):
         return self.table
 
     def to_civis(
@@ -891,6 +929,35 @@ class ToFrom(object):
             tbls.append(petl.fromcsv(file_, **csvargs))
 
         return cls(petl.cat(*tbls))
+
+    @classmethod
+    def from_bigquery(cls, sql: str, app_creds: str = None, project: str = None):
+        """
+        Create a ``parsons table`` from a BigQuery statement.
+
+        To pull an entire BigQuery table, use a query like ``SELECT * FROM {{ table }}``.
+
+        `Args`:
+            sql: str
+                A valid SQL statement
+            app_creds: str
+                A credentials json string or a path to a json file. Not required
+                if ``GOOGLE_APPLICATION_CREDENTIALS`` env variable set.
+            project: str
+                The project which the client is acting on behalf of. If not passed
+                then will use the default inferred environment.
+            TODO - Should users be able to pass in kwargs here? For parameters?
+
+        `Returns`:
+            Parsons Table
+                See :ref:`parsons-table` for output options.
+        """
+
+        from parsons import GoogleBigQuery as BigQuery
+
+        bq = BigQuery(app_creds=app_creds, project=project)
+
+        return bq.query(sql=sql)
 
     @classmethod
     def from_dataframe(cls, dataframe, include_index=False):

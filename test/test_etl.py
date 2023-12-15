@@ -1,12 +1,11 @@
-import unittest
-import petl
 import os
 import shutil
-
-from parsons import Table
+import unittest
 from test.utils import assert_matching_tables
-from parsons.utilities import zip_archive
 
+import petl
+from parsons import Table
+from parsons.utilities import zip_archive
 
 # Notes :
 # - The `Table.to_postgres()` test is housed in the Postgres tests
@@ -306,6 +305,10 @@ class TestParsonsTable(unittest.TestCase):
         # Test that we can't add an existing column name
         self.assertRaises(ValueError, self.tbl.add_column, "first")
 
+    def test_add_column_if_exists(self):
+        self.tbl.add_column("first", if_exists="replace")
+        self.assertEqual(self.tbl.columns, ["first", "last"])
+
     def test_remove_column(self):
         # Test that column is removed correctly
         self.tbl.remove_column("first")
@@ -319,6 +322,34 @@ class TestParsonsTable(unittest.TestCase):
     def test_column_rename_dupe(self):
         # Test that we can't rename to a column that already exists
         self.assertRaises(ValueError, self.tbl.rename_column, "last", "first")
+
+    def test_rename_columns(self):
+        # Test renaming columns with a valid column_map
+        column_map = {"first": "firstname", "last": "lastname"}
+        self.tbl.rename_columns(column_map)
+        self.assertEqual(self.tbl.columns, ["firstname", "lastname"])
+
+    def test_rename_columns_partial(self):
+        # Test renaming only some columns
+        column_map = {"first": "firstname"}
+        self.tbl.rename_columns(column_map)
+        self.assertEqual(self.tbl.columns, ["firstname", "last"])
+
+    def test_rename_columns_nonexistent(self):
+        # Test renaming a column that doesn't exist
+        column_map = {"nonexistent": "newname"}
+        self.assertRaises(KeyError, self.tbl.rename_columns, column_map)
+
+    def test_rename_columns_empty(self):
+        # Test renaming with an empty column_map
+        column_map = {}
+        self.tbl.rename_columns(column_map)
+        self.assertEqual(self.tbl.columns, ["first", "last"])
+
+    def test_rename_columns_duplicate(self):
+        # Test renaming to a column name that already exists
+        column_map = {"first": "last"}
+        self.assertRaises(ValueError, self.tbl.rename_columns, column_map)
 
     def test_fill_column(self):
         # Test that the column is filled
@@ -896,3 +927,73 @@ class TestParsonsTable(unittest.TestCase):
 
         tbl_petl = tbl.use_petl("skipcomments", "#", to_petl=True)
         self.assertIsInstance(tbl_petl, PetlTable)
+
+    def test_deduplicate(self):
+        # Confirm deduplicate works with no keys for one-column duplicates
+        tbl = Table([["a"], [1], [2], [2], [3]])
+        tbl_expected = Table([["a"], [1], [2], [3]])
+        tbl.deduplicate()
+        assert_matching_tables(tbl_expected, tbl)
+
+        # Confirm deduplicate works with no keys for multiple columns
+        tbl = Table([["a", "b"], [1, 2], [1, 2], [1, 3], [2, 3]])
+        tbl_expected = Table(
+            [
+                ["a", "b"],
+                [1, 2],
+                [1, 3],
+                [2, 3],
+            ]
+        )
+        tbl.deduplicate()
+        assert_matching_tables(tbl_expected, tbl)
+
+        # Confirm deduplicate works with one key for multiple columns
+        tbl = Table([["a", "b"], [1, 3], [1, 2], [1, 2], [2, 3]])
+        tbl_expected = Table(
+            [
+                ["a", "b"],
+                [1, 3],
+                [2, 3],
+            ]
+        )
+        tbl.deduplicate(keys=["a"])
+        assert_matching_tables(tbl_expected, tbl)
+
+        # Confirm sorting deduplicate works with one key for multiple columns
+
+        # Note that petl sorts on the column(s) you're deduping on
+        # Meaning it will ignore the 'b' column below
+        # That is, the first row, [1,3],
+        # would not get moved to after the [1,2]
+        tbl = Table([["a", "b"], [2, 3], [1, 3], [1, 2], [1, 2]])
+        tbl_expected = Table(
+            [
+                ["a", "b"],
+                [1, 3],
+                [2, 3],
+            ]
+        )
+        tbl.deduplicate(keys=["a"], presorted=False)
+        assert_matching_tables(tbl_expected, tbl)
+
+        # Confirm sorting deduplicate works for two of two columns
+        tbl = Table([["a", "b"], [2, 3], [1, 3], [1, 2], [1, 2]])
+        tbl_expected = Table(
+            [
+                ["a", "b"],
+                [1, 2],
+                [1, 3],
+                [2, 3],
+            ]
+        )
+        tbl.deduplicate(keys=["a", "b"], presorted=False)
+        assert_matching_tables(tbl_expected, tbl)
+
+        # Confirm deduplicate works for multiple keys
+        tbl = Table(
+            [["a", "b", "c"], [1, 2, 3], [1, 2, 3], [1, 2, 4], [1, 3, 2], [2, 3, 4]]
+        )
+        tbl_expected = Table([["a", "b", "c"], [1, 2, 3], [1, 3, 2], [2, 3, 4]])
+        tbl.deduplicate(["a", "b"])
+        assert_matching_tables(tbl_expected, tbl)
